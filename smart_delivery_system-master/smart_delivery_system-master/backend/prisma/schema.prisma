@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Enums replaced with String for SQLite compatibility
+// Role: CUSTOMER | DRIVER | ADMIN
+// OrderStatus: PENDING | ASSIGNED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  emergencyContact String?
+  role      String   @default("CUSTOMER")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  driverProfile Driver?
+  orders        Order[]       @relation("CustomerOrders")
+  adminBalance  Float         @default(0.0)
+}
+
+model Driver {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  vehicleType     String
+  capacity        Float
+  currentLocation String?    // JSON string { lat: float, lng: float }
+  isAvailable     Boolean  @default(true)
+  shiftHours      String?  // e.g., "09:00-17:00"
+  licenseUrl      String?
+  vehicleRcUrl    String?
+  insuranceUrl    String?
+  fuelStatus      Float?
+  bankDetails     String?
+  performanceRating Float @default(5.0)
+  totalEarnings     Float @default(0.0)
+  walletBalance     Float @default(0.0)
+  reliabilityScore  Float @default(100.0)
+  activeOrderCount  Int   @default(0)
+  bonusEarnings     Float @default(0.0)
+  penaltyAmount     Float @default(0.0)
+  totalDeliveries   Int   @default(0)
+  onTimeDeliveries  Int   @default(0)
+  deliveryZone      String @default("ALL")
+
+  assignedOrders  Order[]          @relation("DriverOrders")
+  routes          Route[]
+  incentives      Incentive[]
+  performanceLogs PerformanceLog[]
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  customerId      String
+  customer        User        @relation("CustomerOrders", fields: [customerId], references: [id])
+  driverId        String?
+  driver          Driver?     @relation("DriverOrders", fields: [driverId], references: [id])
+  routeId         String?
+  route           Route?      @relation(fields: [routeId], references: [id])
+  pickupLocation  String      // JSON string { lat: float, lng: float, address: string }
+  dropLocation    String      // JSON string { lat: float, lng: float, address: string }
+  packageWeight   Float
+  deliveryType    String      @default("COURIER") // e.g., FOOD, GROCERY, MEDICAL, ECOMMERCE, COURIER, RETAIL
+  priority        String      @default("NORMAL")  // NORMAL | EXPRESS | EMERGENCY
+  paymentMethod   String      @default("COD")     // UPI | CREDIT_CARD | WALLET | COD
+  paymentStatus   String      @default("UNPAID")  // UNPAID | PAID
+  deliveryInstructions String?
+  price           Float       @default(0.0)
+  deadline        DateTime?
+  actualDeliveryTime DateTime?
+  status          String      @default("PENDING")
+  isManualAssignment Boolean  @default(false)
+  otp             String?
+  deliveryProofUrl String?
+  rating          Int?
+  feedback        String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  transactions    Transaction[]
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  amount      Float
+  type        String   // PAYMENT | EARNING | COMMISSION
+  status      String   @default("COMPLETED")
+  createdAt   DateTime @default(now())
+}
+
+model Incentive {
+  id        String   @id @default(uuid())
+  driverId  String
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  amount    Float
+  reason    String
+  type      String   // BONUS | PENALTY
+  createdAt DateTime @default(now())
+}
+
+model PerformanceLog {
+  id            String   @id @default(uuid())
+  driverId      String
+  driver        Driver   @relation(fields: [driverId], references: [id])
+  rating        Float
+  onTime        Boolean
+  deliverySpeed Float    // km/h or relative score
+  createdAt     DateTime @default(now())
+}
+
+model Route {
+  id            String   @id @default(uuid())
+  driverId      String
+  driver        Driver   @relation(fields: [driverId], references: [id])
+  stops         String   // JSON Array of locations/orders in sequence
+  optimizedCost Float?
+  fuelEstimate  Float?
+  distance      Float?
+  estimatedTime Float?   // in minutes
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders        Order[]
+}
+
